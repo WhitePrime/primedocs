@@ -5,18 +5,24 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {LoadedContent, DocMetadata, LoadedVersion} from '../types';
+import {updateTranslationFileMessages} from '@docusaurus/utils';
 import {CURRENT_VERSION_NAME} from '../constants';
 import {
   getLoadedContentTranslationFiles,
   translateLoadedContent,
 } from '../translations';
-import {updateTranslationFileMessages} from '@docusaurus/utils';
+import type {
+  DocMetadata,
+  LoadedContent,
+  LoadedVersion,
+} from '@docusaurus/plugin-content-docs';
 
 function createSampleDoc(doc: Pick<DocMetadata, 'id'>): DocMetadata {
   return {
+    sourceDirName: '',
+    draft: false,
+    tags: [],
     editUrl: 'any',
-    isDocsHomePage: false,
     lastUpdatedAt: 0,
     lastUpdatedBy: 'any',
     next: undefined,
@@ -24,10 +30,11 @@ function createSampleDoc(doc: Pick<DocMetadata, 'id'>): DocMetadata {
     permalink: 'any',
     slug: 'any',
     source: 'any',
-    unversionedId: 'any',
     version: 'any',
     title: `${doc.id} title`,
-    sidebar_label: `${doc.id} title`,
+    frontMatter: {
+      sidebar_label: `${doc.id} title`,
+    },
     description: `${doc.id} description`,
     ...doc,
   };
@@ -37,30 +44,24 @@ function createSampleVersion(
   version: Pick<LoadedVersion, 'versionName'>,
 ): LoadedVersion {
   return {
-    versionLabel: `${version.versionName} label`,
-    versionPath: '/docs/',
-    mainDocId: '',
+    label: `${version.versionName} label`,
+    path: '/docs/',
     routePriority: undefined,
     sidebarFilePath: 'any',
     isLast: true,
     contentPath: 'any',
     contentPathLocalized: 'any',
+    tagsPath: '/tags/',
+    banner: null,
+    badge: true,
+    className: '',
+    drafts: [],
     docs: [
-      createSampleDoc({
-        id: 'doc1',
-      }),
-      createSampleDoc({
-        id: 'doc2',
-      }),
-      createSampleDoc({
-        id: 'doc3',
-      }),
-      createSampleDoc({
-        id: 'doc4',
-      }),
-      createSampleDoc({
-        id: 'doc5',
-      }),
+      createSampleDoc({id: 'doc1'}),
+      createSampleDoc({id: 'doc2'}),
+      createSampleDoc({id: 'doc3'}),
+      createSampleDoc({id: 'doc4'}),
+      createSampleDoc({id: 'doc5'}),
     ],
     sidebars: {
       docs: [
@@ -68,6 +69,14 @@ function createSampleVersion(
           type: 'category',
           label: 'Getting started',
           collapsed: false,
+          collapsible: true,
+          link: {
+            type: 'generated-index',
+            slug: '/category/getting-started-index-slug',
+            permalink: '/docs/category/getting-started-index-slug',
+            title: 'Getting started index title',
+            description: 'Getting started index description',
+          },
           items: [
             {
               type: 'doc',
@@ -76,6 +85,8 @@ function createSampleVersion(
             {
               type: 'doc',
               id: 'doc2',
+              label: 'Second doc translatable',
+              translatable: true,
             },
             {
               type: 'link',
@@ -99,8 +110,10 @@ function createSampleVersion(
           id: 'doc4',
         },
         {
-          type: 'doc',
+          type: 'ref',
           id: 'doc5',
+          label: 'Fifth doc translatable',
+          translatable: true,
         },
       ],
     },
@@ -136,20 +149,20 @@ function getSampleTranslationFilesTranslated() {
 }
 
 describe('getLoadedContentTranslationFiles', () => {
-  test('should return translation files matching snapshot', async () => {
+  it('returns translation files', () => {
     expect(getSampleTranslationFiles()).toMatchSnapshot();
   });
 });
 
 describe('translateLoadedContent', () => {
-  test('should not translate anything if translation files are untranslated', () => {
+  it('does not translate anything if translation files are untranslated', () => {
     const translationFiles = getSampleTranslationFiles();
     expect(
       translateLoadedContent(SampleLoadedContent, translationFiles),
     ).toEqual(SampleLoadedContent);
   });
 
-  test('should return translated loaded content matching snapshot', () => {
+  it('returns translated loaded content', () => {
     const translationFiles = getSampleTranslationFilesTranslated();
     expect(
       translateLoadedContent(SampleLoadedContent, translationFiles),
