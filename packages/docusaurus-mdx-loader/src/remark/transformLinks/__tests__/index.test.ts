@@ -5,39 +5,52 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {join} from 'path';
-import remark from 'remark';
-import mdx from 'remark-mdx';
+import path from 'path';
 import vfile from 'to-vfile';
 import plugin from '..';
-import transformImage from '../../transformImage';
+import transformImage, {type PluginOptions} from '../../transformImage';
 
-const processFixture = async (name, options) => {
-  const path = join(__dirname, 'fixtures', `${name}.md`);
-  const staticDir = join(__dirname, 'fixtures', 'static');
-  const file = await vfile.read(path);
+const processFixture = async (name: string, options?: PluginOptions) => {
+  const {remark} = await import('remark');
+  const {default: mdx} = await import('remark-mdx');
+  const siteDir = path.join(__dirname, `__fixtures__`);
+  const staticDirs = [
+    path.join(siteDir, 'static'),
+    path.join(siteDir, 'static2'),
+  ];
+  const file = await vfile.read(path.join(siteDir, `${name}.md`));
   const result = await remark()
     .use(mdx)
-    .use(transformImage, {...options, filePath: path, staticDir})
-    .use(plugin, {...options, filePath: path, staticDir})
+    .use(transformImage, {...options, siteDir, staticDirs})
+    .use(plugin, {
+      ...options,
+      staticDirs,
+      siteDir: path.join(__dirname, '__fixtures__'),
+    })
     .process(file);
 
-  return result.toString();
+  return result.value;
 };
 
 describe('transformAsset plugin', () => {
-  test('fail if asset url is absent', async () => {
+  it('fail if asset url is absent', async () => {
     await expect(
       processFixture('noUrl'),
     ).rejects.toThrowErrorMatchingSnapshot();
   });
 
-  test('transform md links to <a />', async () => {
+  it('fail if asset with site alias does not exist', async () => {
+    await expect(
+      processFixture('nonexistentSiteAlias'),
+    ).rejects.toThrowErrorMatchingSnapshot();
+  });
+
+  it('transform md links to <a />', async () => {
     const result = await processFixture('asset');
     expect(result).toMatchSnapshot();
   });
 
-  test('pathname protocol', async () => {
+  it('pathname protocol', async () => {
     const result = await processFixture('pathname');
     expect(result).toMatchSnapshot();
   });

@@ -5,46 +5,55 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import path from 'path';
-import type {LoadContext, Plugin, HtmlTags} from '@docusaurus/types';
-import type {ThemeConfig} from '@docusaurus/plugin-google-gtag';
+import type {LoadContext, Plugin} from '@docusaurus/types';
+import type {PluginOptions, Options} from './options';
 
-export default function pluginGoogleGtag(context: LoadContext): Plugin {
-  const {
-    siteConfig: {themeConfig},
-  } = context;
-  const {gtag} = themeConfig as ThemeConfig;
+function createConfigSnippet({
+  trackingID,
+  anonymizeIP,
+}: {
+  trackingID: string;
+  anonymizeIP: boolean;
+}): string {
+  return `gtag('config', '${trackingID}', { ${
+    anonymizeIP ? "'anonymize_ip': true" : ''
+  } });`;
+}
 
-  if (!gtag) {
-    throw new Error(
-      `You need to specify "gtag" object in "themeConfig" with "trackingId" field in it to use docusaurus-plugin-google-gtag.`,
-    );
+function createConfigSnippets({
+  trackingID: trackingIDArray,
+  anonymizeIP,
+}: PluginOptions): string {
+  return trackingIDArray
+    .map((trackingID) => createConfigSnippet({trackingID, anonymizeIP}))
+    .join('\n');
+}
+
+export default function pluginGoogleGtag(
+  context: LoadContext,
+  options: PluginOptions,
+): Plugin | null {
+  if (process.env.NODE_ENV !== 'production') {
+    return null;
   }
 
-  const {anonymizeIP, trackingID} = gtag;
-
-  if (!trackingID) {
-    throw new Error(
-      'You specified the "gtag" object in "themeConfig" but the "trackingID" field was missing. ' +
-        'Please ensure this is not a mistake.',
-    );
-  }
-
-  const isProd = process.env.NODE_ENV === 'production';
+  const firstTrackingId = options.trackingID[0];
 
   return {
     name: 'docusaurus-plugin-google-gtag',
 
+    contentLoaded({actions}) {
+      actions.setGlobalData(options);
+    },
+
     getClientModules() {
-      return isProd ? [path.resolve(__dirname, './gtag')] : [];
+      return ['./gtag'];
     },
 
     injectHtmlTags() {
-      if (!isProd) {
-        return {};
-      }
       return {
-        // Gtag includes GA by default, so we also preconnect to google-analytics.
+        // Gtag includes GA by default, so we also preconnect to
+        // google-analytics.
         headTags: [
           {
             tagName: 'link',
@@ -60,12 +69,15 @@ export default function pluginGoogleGtag(context: LoadContext): Plugin {
               href: 'https://www.googletagmanager.com',
             },
           },
-          // https://developers.google.com/analytics/devguides/collection/gtagjs/#install_the_global_site_tag
           {
             tagName: 'script',
             attributes: {
               async: true,
-              src: `https://www.googletagmanager.com/gtag/js?id=${trackingID}`,
+              // We only include the first tracking id here because google says
+              // we shouldn't install multiple tags/scripts on the same page
+              // Instead we should load one script and use n * gtag("config",id)
+              // See https://developers.google.com/tag-platform/gtagjs/install#add-products
+              src: `https://www.googletagmanager.com/gtag/js?id=${firstTrackingId}`,
             },
           },
           {
@@ -74,12 +86,15 @@ export default function pluginGoogleGtag(context: LoadContext): Plugin {
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', '${trackingID}', { ${
-              anonymizeIP ? "'anonymize_ip': true" : ''
-            } });`,
+              ${createConfigSnippets(options)};
+              `,
           },
-        ] as HtmlTags,
+        ],
       };
     },
   };
 }
+
+export {validateThemeConfig, validateOptions} from './options';
+
+export type {PluginOptions, Options};
